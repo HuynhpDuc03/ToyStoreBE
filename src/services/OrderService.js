@@ -51,7 +51,7 @@ const Product = require("../models/ProductModel");
 
 const createOrder = (newOrder) => {
     return new Promise(async (resolve, reject) => {
-        const { orderItems,paymentMethod, itemsPrice, shippingPrice, totalPrice, fullName, address, city, district, ward, phone,user, isPaid, paidAt,orderDate } = newOrder
+        const { orderItems,paymentMethod, itemsPrice, shippingPrice, totalPrice, fullName, address, city, district, ward, phone,user, isPaid, paidAt, discountPrice } = newOrder
         try {
             const promises = orderItems.map(async (order) => {
                 const productData = await Product.findOneAndUpdate(
@@ -108,6 +108,7 @@ const createOrder = (newOrder) => {
                     user: user,
                     isPaid, 
                     paidAt,
+                    discountPrice,
                 })
                 if (createdOrder) {
                     // await EmailService.sendEmailCreateOrder(email,orderItems)
@@ -182,7 +183,6 @@ const getOrderDetails = (id) => {
         data: order,
       });
     } catch (e) {
-      // console.log('e', e)
       reject(e);
     }
   });
@@ -232,7 +232,7 @@ const cancelOrderDetails = (id, data) => {
         });
       }
       resolve({
-        status: "OK",
+        status: "OK", 
         message: "success",
         data: order,
       });
