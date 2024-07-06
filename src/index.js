@@ -16,9 +16,8 @@ app.use(cookieParser());
 routes(app);
 
 
-
 app.get('/', (req, res) => {
-    res.send('Hello World aaa');
+    res.send('HELLO IN BACKEND');
 });
 
 app.listen(post, () => {
