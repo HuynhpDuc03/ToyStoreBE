@@ -141,15 +141,16 @@ const getAllType = async (req, res) => {
         })
     }
 }
-const getAllBestSellerProduct = async (req, res) => {
+
+const getAllSpecialProducts = async (req, res) => {
     try {
         const { limit } = req.query
-        const response = await ProductService.getAllBestSellerProduct(Number(limit) || null)
+        const response = await ProductService.getAllSpecialProducts(Number(limit) || null)
         return res.status(200).json(response)
     } catch (e) {
-        return res.status(404).json({
-            message: e
-        })
+        return res.status(500).json({
+            message: "Đã xảy ra lỗi, vui lòng thử lại sau."
+        });
     }
 }
 
@@ -161,7 +162,7 @@ module.exports = {
     getAllProduct,
     deleteMany,
     getAllType,
-    getAllBestSellerProduct
+    getAllSpecialProducts
 }
 
 // const getAllProduct = async (req, res) => {

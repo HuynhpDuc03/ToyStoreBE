@@ -1,6 +1,11 @@
 const User = require("../models/UserModel");
 const bcrypt = require("bcrypt");
 const { genneralAccessToken, genneralRefreshToken } = require("./JwtService");
+const {
+  sendEmailForgotPassword,
+  generateOTP,
+} = require("../services/EmailService");
+const crypto = require("crypto");
 
 const createUser = (newUser) => {
   return new Promise(async (resolve, reject) => {
@@ -34,7 +39,6 @@ const createUser = (newUser) => {
     }
   });
 };
-
 
 const loginUser = (userLogin) => {
   return new Promise(async (resolve, reject) => {
@@ -78,8 +82,6 @@ const loginUser = (userLogin) => {
     }
   });
 };
-
-
 
 const updateUser = (id, data) => {
   return new Promise(async (resolve, reject) => {
@@ -186,6 +188,66 @@ const getDetailsUser = (id) => {
   });
 };
 
+const forgotPassword = async (email) => {
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return { status: "ERR", message: "Email does not exist" };
+    }
+
+    const otp = generateOTP();
+    await sendEmailForgotPassword(email, otp);
+
+    user.resetPasswordOTP = otp;
+    user.otpExpiry = Date.now() + 5 * 60 * 1000;
+    await user.save();
+
+    return { status: "OK", message: "OTP has been sent to your email" };
+  } catch (error) {
+    throw error;
+  }
+};
+const verifyOtp = async (email, otp) => {
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return { status: "ERR", message: "Email does not exist" };
+    }
+
+    if (user.resetPasswordOTP !== otp) {
+      return { status: "ERR", message: "Invalid OTP" };
+    }
+
+    if (user.otpExpiry < Date.now()) {
+      return { status: "ERR", message: "OTP has expired" };
+    }
+
+    return { status: "OK", message: "OTP is valid" };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const resetPassword = async (email, newPassword) => {
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return { status: "ERR", message: "Email does not exist" };
+    }
+
+    const hash = bcrypt.hashSync(newPassword, 10);
+
+    user.password = hash;
+    user.resetPasswordOTP = null;
+    user.otpExpiry = null;
+    await user.save();
+
+    return { status: "OK", message: "Password has been successfully reset" };
+  } catch (error) {
+    throw error;
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
@@ -194,4 +256,7 @@ module.exports = {
   getAllUser,
   getDetailsUser,
   deleteManyUser,
+  forgotPassword,
+  verifyOtp,
+  resetPassword
 };

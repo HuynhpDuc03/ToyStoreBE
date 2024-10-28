@@ -13,6 +13,7 @@ const productSchema = new mongoose.Schema(
     bestSeller: { type: Boolean, default: false, required: false },
     hotSale: { type: Boolean, default: false, required: false },
     newArrivals: { type: Boolean, default: false, required: false },
+    viewCount: { type: Number, default: 0 },
 
   },
   {

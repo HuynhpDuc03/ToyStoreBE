@@ -1,6 +1,5 @@
 const OrderService = require("../services/OrderService");
 const Order = require("../models/OrderProduct");
-
 const createOrder = async (req, res) => {
   try {
     const {
@@ -16,7 +15,8 @@ const createOrder = async (req, res) => {
       phone,
       discountPrice,
     } = req.body;
-    console.log("controller", req.body);
+
+    // Validate inputs in a more efficient way
     if (
       !paymentMethod ||
       !itemsPrice ||
@@ -30,30 +30,32 @@ const createOrder = async (req, res) => {
       !phone ||
       discountPrice === undefined
     ) {
-      return res.status(200).json({
-        status: "ERR",
-        message: "The input is required",
-      });
+      return res.status(400).json({ status: "ERR", message: "Invalid input" });
     }
+
     const response = await OrderService.createOrder(req.body);
     return res.status(200).json(response);
   } catch (e) {
-    return res.status(404).json({
-      message: e,
-    });
+    return res.status(500).json({ message: e.message });
   }
 };
 
 const getAllOrderDetails = async (req, res) => {
   try {
     const userId = req.params.id;
+    const { page = 0, limit = 10, status = 0 } = req.query;
     if (!userId) {
       return res.status(200).json({
         status: "ERR",
         message: "The userId is required",
       });
     }
-    const response = await OrderService.getAllOrderDetails(userId);
+    const response = await OrderService.getAllOrderDetails(
+      userId,
+      page,
+      limit,
+      status
+    );
     return res.status(200).json(response);
   } catch (e) {
     // console.log(e)
@@ -104,7 +106,9 @@ const cancelOrderDetails = async (req, res) => {
 
 const getAllOrder = async (req, res) => {
   try {
-    const data = await OrderService.getAllOrder();
+    const page = parseInt(req.query.page) || 1; // Default to page 1
+    const limit = parseInt(req.query.limit) || 10; // Default limit to 10
+    const data = await OrderService.getAllOrder(page, limit);
     return res.status(200).json(data);
   } catch (e) {
     return res.status(404).json({
@@ -155,83 +159,6 @@ const markOrderAsReceived = async (req, res) => {
   }
 };
 
-const getRevenueByMonth = async (req, res) => {
-  try {
-    const { month, year } = req.query;
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0);
-
-    const orders = await Order.aggregate([
-      {
-        $match: {
-          createdAt: { $gte: startDate, $lte: endDate },
-          isPaid: true,
-        },
-      },
-      {
-        $group: {
-          _id: { $dayOfMonth: "$createdAt" },
-          totalRevenue: { $sum: "$totalPrice" },
-        },
-      },
-      { $sort: { _id: 1 } },
-    ]);
-
-    const formattedOrders = orders.map((order) => ({
-      day: order._id,
-      totalRevenue: order.totalRevenue,
-    }));
-
-    res.status(200).json({ status: "OK", data: formattedOrders });
-  } catch (e) {
-    res.status(500).json({ status: "ERR", message: e.message });
-  }
-};
-
-const getAvailableYears = async (req, res) => {
-  try {
-    const response = await OrderService.getAvailableYears();
-    return res.status(200).json(response);
-  } catch (e) {
-    return res.status(500).json({ status: "ERR", message: e.message });
-  }
-};
-
-const getAvailableMonths = async (req, res) => {
-  try {
-    const { year } = req.query;
-    if (!year) {
-      return res.status(400).json({
-        status: "ERR",
-        message: "Year is required",
-      });
-    }
-    const response = await OrderService.getAvailableMonths(year);
-    return res.status(200).json(response);
-  } catch (e) {
-    return res.status(500).json({ status: "ERR", message: e.message });
-  }
-};
-
-const getAnnualRevenue = async (req, res) => {
-  try {
-    const { year } = req.query;
-    if (!year) {
-      return res.status(400).json({
-        status: "ERR",
-        message: "Year is required",
-      });
-    }
-    const response = await OrderService.getAnnualRevenue(year);
-    return res.status(200).json(response);
-  } catch (e) {
-    return res.status(500).json({
-      status: "ERR",
-      message: e.message,
-    });
-  }
-};
-
 module.exports = {
   createOrder,
   getAllOrderDetails,
@@ -240,8 +167,4 @@ module.exports = {
   getAllOrder,
   updateOrderStatus,
   markOrderAsReceived,
-  getRevenueByMonth,
-  getAvailableYears,
-  getAvailableMonths,
-  getAnnualRevenue,
 };

@@ -115,11 +115,14 @@ const deleteManyProduct = (ids) => {
 const getDetailsProduct = (id) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const product = await Product.findOne({
-        _id: id,
-      });
-      if (product === null) {
-        resolve({
+      const product = await Product.findOneAndUpdate(
+        { _id: id },
+        { $inc: { viewCount: 1 } }, // Increment viewCount by 1
+        { new: true } // Return the updated product
+      );
+
+      if (!product) {
+        return resolve({
           status: "ERR",
           message: "The product is not defined",
         });
@@ -127,7 +130,7 @@ const getDetailsProduct = (id) => {
 
       resolve({
         status: "OK",
-        message: "SUCESS",
+        message: "SUCCESS",
         data: product,
       });
     } catch (e) {
@@ -141,7 +144,7 @@ const getAllProduct = (limit, page, sort, filters) => {
     try {
       let query = {};
 
-      // Sử dụng bộ lọc
+      // Apply filters
       if (filters && Array.isArray(filters)) {
         filters.forEach((filter) => {
           const [key, value] = filter.split("=");
@@ -151,10 +154,73 @@ const getAllProduct = (limit, page, sort, filters) => {
             } else if (key === "name") {
               query.name = { $regex: value, $options: "i" };
             } else if (key === "price") {
-              const [min, max] = value.split("-").map(Number);
-              query.price = {};
-              if (min) query.price.$gte = min;
-              if (max) query.price.$lte = max;
+              const priceRanges = value.split(","); // Tách các dải giá
+              const priceConditions = priceRanges.map((range) => {
+                const [min, max] = range.split("-").map(Number);
+                let condition = {};
+                if (min && max) {
+                  condition = {
+                    $and: [
+                      {
+                        $gte: [
+                          {
+                            $multiply: [
+                              "$price",
+                              {
+                                $subtract: [1, { $divide: ["$discount", 100] }],
+                              },
+                            ],
+                          },
+                          min,
+                        ],
+                      },
+                      {
+                        $lte: [
+                          {
+                            $multiply: [
+                              "$price",
+                              {
+                                $subtract: [1, { $divide: ["$discount", 100] }],
+                              },
+                            ],
+                          },
+                          max,
+                        ],
+                      },
+                    ],
+                  };
+                } else if (min) {
+                  condition = {
+                    $gte: [
+                      {
+                        $multiply: [
+                          "$price",
+                          { $subtract: [1, { $divide: ["$discount", 100] }] },
+                        ],
+                      },
+                      min,
+                    ],
+                  };
+                } else if (max) {
+                  condition = {
+                    $lte: [
+                      {
+                        $multiply: [
+                          "$price",
+                          { $subtract: [1, { $divide: ["$discount", 100] }] },
+                        ],
+                      },
+                      max,
+                    ],
+                  };
+                }
+                return condition;
+              });
+
+              // Dùng $or để lọc nhiều dải giá
+              query.$expr = {
+                $or: priceConditions,
+              };
             } else {
               query[key] = { $regex: value, $options: "i" };
             }
@@ -162,33 +228,35 @@ const getAllProduct = (limit, page, sort, filters) => {
         });
       }
 
-      // Sắp xếp
+      // Define sorting logic
       let sortOrder = {};
       if (sort) {
         if (sort === "lowtohigh") {
-          sortOrder = { price: 1 };
+          sortOrder = { price: 1 }; // Sort by price ascending
         } else if (sort === "hightolow") {
-          sortOrder = { price: -1 };
+          sortOrder = { price: -1 }; // Sort by price descending
         } else if (sort === "name-asc") {
-          sortOrder = { name: 1 };
+          sortOrder = { name: 1 }; // Sort by name ascending
         } else if (sort === "name-desc") {
-          sortOrder = { name: -1 };
+          sortOrder = { name: -1 }; // Sort by name descending
         } else if (sort === "bestSeller") {
-          query.bestSeller = true;
-        } else if (sort === "hotSale") {
-          query.hotSale = true;
+          sortOrder = { selled: -1 }; // Sort by number of items sold descending (Best Seller)
+        } else if (sort === "popular") {
+          sortOrder = { viewCount: -1 }; // Sort by view count descending (Popular)
         } else if (sort === "newArrivals") {
-          query.newArrivals = true;
+          sortOrder = { createdAt: -1 }; // Sort by creation date descending (Newest)
         }
       }
 
+      // Get total number of products for pagination
       const totalProduct = await Product.countDocuments(query);
       let products = [];
 
+      // Fetch products with sorting and pagination
       if (!limit) {
         products = await Product.find(query)
           .sort(sortOrder)
-          .sort({ createdAt: -1, updatedAt: -1 });
+          .sort({ createdAt: -1, updatedAt: -1 }); // Secondary sort by createdAt or updatedAt
       } else {
         products = await Product.find(query)
           .sort(sortOrder)
@@ -225,23 +293,50 @@ const getAllType = () => {
     }
   });
 };
-const getAllBestSellerProduct = (limit) => {
+const getAllSpecialProducts = (limit) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const allProduct = await Product.find({ bestSeller: true })
-        .limit(limit)
-        .sort({ createdAt: -1, updatedAt: -1 });
+      const queryOptions = { bestSeller: true, hotSale: true, newArrivals: true };
+      const bestSellerProducts = await Product.find({ ...queryOptions, bestSeller: true })
+        .sort({ createdAt: -1 })
+        .limit(limit || 0); // Nếu limit là null, thì không giới hạn
+
+      const hotSaleProducts = await Product.find({ ...queryOptions, hotSale: true })
+        .sort({ createdAt: -1 })
+        .limit(limit || 0);
+
+      const newArrivalsProducts = await Product.find({ ...queryOptions, newArrivals: true })
+        .sort({ createdAt: -1 })
+        .limit(limit || 0);
+
+      const combinedProducts = [
+        ...bestSellerProducts,
+        ...hotSaleProducts,
+        ...newArrivalsProducts,
+      ];
+
+      const uniqueProducts = [
+        ...new Map(combinedProducts.map((item) => [item._id, item])).values(),
+      ];
+
+      const sortedUniqueProducts = uniqueProducts.sort(
+        (a, b) => b.createdAt - a.createdAt
+      );
+
+      const finalProducts = sortedUniqueProducts.slice(0, limit || undefined);  
+
       resolve({
         status: "OK",
         message: "Success",
-        data: allProduct,
-        total: allProduct.length,
+        data: finalProducts,
+        total: finalProducts.length,
       });
     } catch (e) {
       reject(e);
     }
   });
 };
+
 module.exports = {
   createProduct,
   updateProduct,
@@ -250,54 +345,5 @@ module.exports = {
   getAllProduct,
   deleteManyProduct,
   getAllType,
-  getAllBestSellerProduct,
+  getAllSpecialProducts,
 };
-
-// const getAllProduct = (limit, page, sort, filter) => {
-//     return new Promise(async (resolve, reject) => {
-//         try {
-//             const totalProduct = await Product.countDocuments()
-//             let allProduct = []
-//             if (filter) {
-//                 const label = filter[0];
-//                 const allObjectFilter = await Product.find({ [label]: { '$regex': filter[1] } }).limit(limit).skip(page * limit).sort({createdAt: -1, updatedAt: -1})
-//                 resolve({
-//                     status: 'OK',
-//                     message: 'Success',
-//                     data: allObjectFilter,
-//                     total: totalProduct,
-//                     pageCurrent: Number(page + 1),
-//                     totalPage: Math.ceil(totalProduct / limit)
-//                 })
-//             }
-//             if (sort) {
-//                 const objectSort = {}
-//                 objectSort[sort[1]] = sort[0]
-//                 const allProductSort = await Product.find().limit(limit).skip(page * limit).sort(objectSort).sort({createdAt: -1, updatedAt: -1})
-//                 resolve({
-//                     status: 'OK',
-//                     message: 'Success',
-//                     data: allProductSort,
-//                     total: totalProduct,
-//                     pageCurrent: Number(page + 1),
-//                     totalPage: Math.ceil(totalProduct / limit)
-//                 })
-//             }
-//             if(!limit) {
-//                 allProduct = await Product.find().sort({createdAt: -1, updatedAt: -1})
-//             }else {
-//                 allProduct = await Product.find().limit(limit).skip(page * limit).sort({createdAt: -1, updatedAt: -1})
-//             }
-//             resolve({
-//                 status: 'OK',
-//                 message: 'Success',
-//                 data: allProduct,
-//                 total: totalProduct,
-//                 pageCurrent: Number(page + 1),
-//                 totalPage: Math.ceil(totalProduct / limit)
-//             })
-//         } catch (e) {
-//             reject(e)
-//         }
-//     })
-// }

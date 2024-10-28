@@ -178,6 +178,65 @@ const logoutUser = async (req, res) => {
     });
   }
 };
+
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Email is required",
+      });
+    }
+
+    const response = await UserService.forgotPassword(email);
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || error,
+    });
+  }
+};
+
+
+const verifyOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Email and OTP are required",
+      });
+    }
+
+    const response = await UserService.verifyOtp(email, otp);
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || error,
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Email, new password, and confirm password are required",
+      });
+    }
+
+    const response = await UserService.resetPassword(email, newPassword);
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || error,
+    });
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
@@ -188,4 +247,7 @@ module.exports = {
   refreshToken,
   logoutUser,
   deleteMany,
+  forgotPassword,
+  verifyOtp,
+  resetPassword
 };

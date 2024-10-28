@@ -1,7 +1,15 @@
 const Order = require("../models/OrderProduct");
 const Product = require("../models/ProductModel");
-// const EmailService = require("../services/EmailService")
+const EmailService = require("../services/EmailService");
+const VnProvinces = require("vn-local-plus");
 
+const getAddressDetails = (cityCode, districtCode, wardCode) => {
+  const city = VnProvinces.getProvinceByCode(cityCode)?.name;
+  const district = VnProvinces.getDistrictByCode(districtCode)?.name;
+  const ward = VnProvinces.getWardByCode(wardCode)?.name;
+
+  return { city, district, ward };
+};
 const createOrder = (newOrder) => {
   return new Promise(async (resolve, reject) => {
     const {
@@ -20,100 +28,127 @@ const createOrder = (newOrder) => {
       isPaid,
       paidAt,
       discountPrice,
+      email,
     } = newOrder;
+
     try {
-      const promises = orderItems.map(async (order) => {
-        const productData = await Product.findOneAndUpdate(
-          {
+      // Sử dụng bulkWrite để cập nhật sản phẩm
+      const bulkOperations = orderItems.map((order) => ({
+        updateOne: {
+          filter: {
             _id: order.product,
-            countInStock: { $gte: order.amount },
+            countInStock: { $gte: order.amount }, // Chỉ cập nhật nếu đủ số lượng
           },
-          {
+          update: {
             $inc: {
               countInStock: -order.amount,
-              selled: +order.amount,
+              selled: order.amount,
             },
           },
-          { new: true }
-        );
-        if (productData) {
-          return {
-            status: "OK",
-            message: "SUCCESS",
-          };
-        } else {
-          return {
-            status: "OK",
-            message: "ERR",
-            id: order.product,
-          };
+        },
+      }));
+
+      // Thực hiện bulkWrite
+      const bulkResult = await Product.bulkWrite(bulkOperations);
+
+      // Kiểm tra sản phẩm nào không cập nhật thành công
+      if (bulkResult.modifiedCount < orderItems.length) {
+        const insufficientStock = orderItems.filter((item, index) => !bulkResult.modifiedCount[index]);
+        const arrId = insufficientStock.map((item) => item.product);
+        return resolve({
+          status: "ERR",
+          message: `Sản phẩm với id: ${arrId.join(", ")} không đủ hàng`,
+        });
+      }
+
+      // Tạo đơn hàng
+      const createdOrder = await Order.create({
+        orderItems,
+        shippingAddress: {
+          fullName,
+          address,
+          city,
+          district,
+          ward,
+          phone,
+        },
+        paymentMethod,
+        itemsPrice,
+        shippingPrice,
+        totalPrice,
+        user,
+        email,
+        isPaid,
+        paidAt,
+        discountPrice,
+      });
+
+      // Thực hiện gửi email không đồng bộ
+      const { city: cityName, district: districtName, ward: wardName } = getAddressDetails(city, district, ward);
+      const orderDetails = {
+        fullName,
+        email,
+        phone,
+        address,
+        city: cityName,
+        district: districtName,
+        ward: wardName,
+        orderNumber: createdOrder._id,
+        orderDate: createdOrder.createdAt,
+        totalPrice: createdOrder.totalPrice,
+      };
+
+      // Gửi email sau khi API phản hồi
+      setImmediate(async () => {
+        try {
+          await EmailService.sendEmailCreateOrder(email, fullName, orderItems, orderDetails);
+        } catch (error) {
+          console.error(`Error sending email: ${error.message}`);
         }
       });
-      const results = await Promise.all(promises);
-      const newData = results && results.filter((item) => item.id);
-      if (newData.length) {
-        const arrId = [];
-        newData.forEach((item) => {
-          arrId.push(item.id);
-        });
-        resolve({
-          status: "ERR",
-          message: `San pham voi id: ${arrId.join(",")} khong du hang`,
-        });
-      } else {
-        const createdOrder = await Order.create({
-          orderItems,
-          shippingAddress: {
-            fullName,
-            address,
-            city,
-            district,
-            ward,
-            phone,
-          },
-          paymentMethod,
-          itemsPrice,
-          shippingPrice,
-          totalPrice,
-          user: user,
-          isPaid,
-          paidAt,
-          discountPrice,
-        });
-        if (createdOrder) {
-          // await EmailService.sendEmailCreateOrder(email,orderItems)
-          resolve({
-            status: "OK",
-            message: "success",
-          });
-        }
-      }
-    } catch (e) {
-      reject(e);
+
+      // Phản hồi ngay lập tức mà không đợi email hoàn thành
+      return resolve({
+        status: "OK",
+        message: "success",
+      });
+
+    } catch (error) {
+      return reject(error);
     }
   });
 };
 
-const getAllOrderDetails = (id) => {
+const getAllOrderDetails = (id, page, limit, status) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const order = await Order.find({
-        user: id,
-      }).sort({ createdAt: -1, updatedAt: -1 });
-      if (order === null) {
-        resolve({
-          status: "ERR",
-          message: "The order is not defined",
-        });
+      const skip = page * limit;
+      const query = { user: id };
+       
+      if (status !== '0') {  
+        query.orderStatus = status;
       }
 
-      resolve({
-        status: "OK",
-        message: "SUCESSS",
-        data: order,
-      });
+      const totalOrders = await Order.countDocuments(query);
+      const orders = await Order.find(query)
+        .sort({ createdAt: -1, updatedAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+      if (orders.length === 0) {
+        resolve({
+          status: "ERR",
+          message: "No orders found",
+        });
+      } else {
+        resolve({
+          status: "OK",
+          message: "SUCCESS",
+          total: totalOrders,
+          data: orders,
+        });
+      }
     } catch (e) {
-      // console.log('e', e)
       reject(e);
     }
   });
@@ -196,18 +231,40 @@ const cancelOrderDetails = (id, data) => {
     }
   });
 };
-
-const getAllOrder = () => {
+const getAllOrder = (page, limit) => {
   return new Promise(async (resolve, reject) => {
     try {
-      const allOrder = await Order.find().sort({
-        createdAt: -1,
-        updatedAt: -1,
-      });
+      const skip = (page - 1) * limit;
+
+      // Fetch orders for the current page
+      const allOrder = await Order.find()
+        .sort({
+          createdAt: -1,
+          updatedAt: -1,
+        })
+        .skip(skip)
+        .limit(limit);
+
+      // Get total count for pagination info
+      const totalOrders = await Order.countDocuments();
+
+      // Calculate total revenue (sum of totalPrice for all paid orders)
+      const totalRevenue = await Order.aggregate([
+        { $match: { isPaid: true } }, // Only paid orders
+        { $group: { _id: null, total: { $sum: "$totalPrice" } } }, // Sum totalPrice
+      ]);
+
+      // If totalRevenue is empty, set it to 0
+      const revenue = totalRevenue.length > 0 ? totalRevenue[0].total : 0;
+
       resolve({
         status: "OK",
         message: "Success",
         data: allOrder,
+        total: totalOrders,
+        page,
+        limit,
+        totalRevenue: revenue, // Include total revenue in the response
       });
     } catch (e) {
       reject(e);
@@ -255,90 +312,8 @@ const markOrderAsReceived = async (orderId, isPaid, isDelivered) => {
   }
 };
 
-const getAvailableYears = () => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const years = await Order.aggregate([
-        {
-          $group: {
-            _id: { $year: "$createdAt" },
-          },
-        },
-        {
-          $sort: { _id: 1 },
-        },
-      ]);
-      const availableYears = years.map((y) => y._id);
-      resolve({ status: "OK", data: availableYears });
-    } catch (e) {
-      reject(e);
-    }
-  });
-};
 
-const getAvailableMonths = (year) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const months = await Order.aggregate([
-        {
-          $match: {
-            createdAt: {
-              $gte: new Date(`${year}-01-01`),
-              $lt: new Date(`${year}-12-31`),
-            },
-          },
-        },
-        {
-          $group: {
-            _id: { $month: "$createdAt" },
-          },
-        },
-        {
-          $sort: { _id: 1 },
-        },
-      ]);
-      const availableMonths = months.map((m) => m._id);
-      resolve({ status: "OK", data: availableMonths });
-    } catch (e) {
-      reject(e);
-    }
-  });
-};
-const getAnnualRevenue = (year) => {
-  return new Promise(async (resolve, reject) => {
-    try {
-      const startOfYear = new Date(`${year}-01-01T00:00:00.000Z`);
-      const endOfYear = new Date(`${year}-12-31T23:59:59.999Z`);
 
-      const revenueData = await Order.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: startOfYear, $lte: endOfYear },
-            isPaid: true,
-          },
-        },
-        {
-          $group: {
-            _id: { $month: "$createdAt" },
-            totalRevenue: { $sum: "$totalPrice" },
-          },
-        },
-        {
-          $project: {
-            month: "$_id",
-            totalRevenue: 1,
-            _id: 0,
-          },
-        },
-        { $sort: { month: 1 } },
-      ]);
-
-      resolve({ status: "OK", data: revenueData });
-    } catch (e) {
-      reject({ status: "ERR", message: e.message });
-    }
-  });
-};
 
 module.exports = {
   createOrder,
@@ -348,7 +323,4 @@ module.exports = {
   getAllOrder,
   updateOrderStatus,
   markOrderAsReceived,
-  getAvailableYears,
-  getAvailableMonths,
-  getAnnualRevenue,
 };

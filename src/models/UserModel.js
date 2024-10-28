@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
     ward: { type: String, required: false },
     access_token: { type: String, required: false },
     refresh_token: { type: String, required: false },
+    resetPasswordOTP: { type: String, required: false }, 
+    otpExpiry: { type: Date, required: false }, 
   },
   {
     timestamps: true,

@@ -11,9 +11,4 @@ router.delete('/cancel-order/:id',authUserMiddleWare, OrderController.cancelOrde
 router.get('/get-all-order',authMiddleWare, OrderController.getAllOrder)
 router.put('/update-status', authMiddleWare,OrderController.updateOrderStatus);
 router.put('/mark-as-received', authUserMiddleWare,OrderController.markOrderAsReceived);
-
-router.get('/revenue-by-month', authMiddleWare, OrderController.getRevenueByMonth);
-router.get('/available-years', OrderController.getAvailableYears);
-router.get('/available-months', OrderController.getAvailableMonths);
-router.get('/annual-revenue', OrderController.getAnnualRevenue);
 module.exports = router
