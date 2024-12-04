@@ -4,6 +4,7 @@ const OrderRouter = require("./OrderRouter");
 const CouponRouter = require("./CouponRouter");
 const BlogRouter = require("./BlogRouter");
 const DashboardRouter = require("./DashboardRouter");
+const RatingRouter = require("./RatingRouter");
 
 const routes = (app) => {
   app.use("/api/user", UserRouter);
@@ -11,6 +12,7 @@ const routes = (app) => {
   app.use("/api/order", OrderRouter);
   app.use("/api/coupon", CouponRouter);
   app.use("/api/blog", BlogRouter);
+  app.use("/api/rating", RatingRouter);
   app.use("/api/dashboard", DashboardRouter);
 };
 

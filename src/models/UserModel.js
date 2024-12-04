@@ -13,7 +13,9 @@ const userSchema = new mongoose.Schema(
     access_token: { type: String, required: false },
     refresh_token: { type: String, required: false },
     resetPasswordOTP: { type: String, required: false }, 
+    registerOTP: { type: String, required: false }, 
     otpExpiry: { type: Date, required: false }, 
+    isBlock: { type: Boolean, default: false, required: true}
   },
   {
     timestamps: true,

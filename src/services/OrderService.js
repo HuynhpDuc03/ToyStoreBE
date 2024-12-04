@@ -181,49 +181,58 @@ const getOrderDetails = (id) => {
 const cancelOrderDetails = (id, data) => {
   return new Promise(async (resolve, reject) => {
     try {
-      let order = [];
-      const promises = data.map(async (order) => {
+      let order = null;  
+      const promises = data.map(async (orderItem) => {
         const productData = await Product.findOneAndUpdate(
           {
-            _id: order.product,
-            selled: { $gte: order.amount },
+            _id: orderItem.product,
+            selled: { $gte: orderItem.amount },
           },
           {
             $inc: {
-              countInStock: +order.amount,
-              selled: -order.amount,
+              countInStock: +orderItem.amount,
+              selled: -orderItem.amount,
             },
           },
           { new: true }
         );
-        if (productData) {
-          order = await Order.findByIdAndDelete(id);
-          if (order === null) {
-            resolve({
-              status: "ERR",
-              message: "The order is not defined",
-            });
-          }
-        } else {
+
+        if (!productData) {
           return {
-            status: "OK",
-            message: "ERR",
-            id: order.product,
+            status: "ERR",
+            message: "San pham voi id khong ton tai",
+            id: orderItem.product,
           };
         }
       });
-      const results = await Promise.all(promises);
-      const newData = results && results[0] && results[0].id;
 
-      if (newData) {
-        resolve({
+      const results = await Promise.all(promises);
+      const failedProduct = results.find((result) => result && result.status === "ERR");
+
+      if (failedProduct) {
+        return resolve({
           status: "ERR",
-          message: `San pham voi id: ${newData} khong ton tai`,
+          message: `San pham voi id: ${failedProduct.id} khong ton tai hoac so luong khong du`,
         });
       }
+
+     
+      order = await Order.findByIdAndUpdate(
+        id,
+        { orderStatus: "5" },
+        { new: true }
+      );
+
+      if (!order) {
+        return resolve({
+          status: "ERR",
+          message: "Khong tim thay don hang de cap nhat trang thai",
+        });
+      }
+
       resolve({
         status: "OK",
-        message: "success",
+        message: "Huy don hang thanh cong",
         data: order,
       });
     } catch (e) {
@@ -231,6 +240,8 @@ const cancelOrderDetails = (id, data) => {
     }
   });
 };
+
+
 const getAllOrder = (page, limit) => {
   return new Promise(async (resolve, reject) => {
     try {

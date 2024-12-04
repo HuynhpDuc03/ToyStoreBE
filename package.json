@@ -24,6 +24,7 @@
     "mongoose": "^8.3.2",
     "nodemailer": "^6.9.15",
     "nodemon": "^3.1.0",
+    "redis": "^4.7.0",
     "uuid": "^10.0.0",
     "vn-local-plus": "^1.1.6"
   }

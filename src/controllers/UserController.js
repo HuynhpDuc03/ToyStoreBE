@@ -201,7 +201,7 @@ const forgotPassword = async (req, res) => {
 
 const verifyOtp = async (req, res) => {
   try {
-    const { email, otp } = req.body;
+    const { email, otp, otpType } = req.body;
     if (!email || !otp) {
       return res.status(400).json({
         status: "ERR",
@@ -209,7 +209,7 @@ const verifyOtp = async (req, res) => {
       });
     }
 
-    const response = await UserService.verifyOtp(email, otp);
+    const response = await UserService.verifyOtp(email, otp,otpType);
     return res.status(200).json(response);
   } catch (error) {
     return res.status(500).json({
@@ -237,6 +237,26 @@ const resetPassword = async (req, res) => {
   }
 };
 
+
+const RegisterSendOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        status: "ERR",
+        message: "Email is required",
+      });
+    }
+
+    const response = await UserService.RegisterSendOTP(email);
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message || error,
+    });
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
@@ -249,5 +269,6 @@ module.exports = {
   deleteMany,
   forgotPassword,
   verifyOtp,
-  resetPassword
+  resetPassword,
+  RegisterSendOTP
 };

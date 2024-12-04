@@ -28,11 +28,8 @@ const sendEmailCreateOrder = async (email, fullName, orderItems, orderDetails) =
   const attachImage = [];
 
   for (const item of orderItems) {
-    if (item.image && item.image.length > 0) {
       try {
-        const firstImage = item.image[0];
-        const image = await loadImage(firstImage);
-
+        const image = await loadImage(item.image);
         const canvas = createCanvas(80, 80);
         const ctx = canvas.getContext('2d');
         ctx.drawImage(image, 0, 0, 80, 80);
@@ -63,7 +60,6 @@ const sendEmailCreateOrder = async (email, fullName, orderItems, orderDetails) =
       } catch (error) {
         console.error('Error processing image:', error);
       }
-    }
   }
 
   await transporter.sendMail({
@@ -140,8 +136,28 @@ const sendEmailForgotPassword = async (email, otp) => {
   console.log("OTP email sent successfully");
 };
 
+
+const sendEmailRegisterOTP = async (email, otp) => {
+  await transporter.sendMail({
+    from: process.env.MAIL_ACCOUNT,
+    to: email,
+    subject: "Xác thực tài khoản - AntBaby",
+    html: `
+      <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee;">
+        <h2 style="text-align: center;">Xác thực tài khoản</h2>
+        <p>Chúng tôi nhận được yêu cầu xác thực tài khoản của bạn. Đây là mã OTP để xác thực:</p>
+        <h3 style="text-align: center;">${otp}</h3>
+        <p>Mã này có hiệu lực trong vòng 5 phút. Nếu bạn không yêu cầu xác thực tài khoản, vui lòng bỏ qua email này.</p>
+        <p>Trân trọng,<br/>Đội ngũ AntBaby</p>
+      </div>`,
+  });
+
+  console.log("OTP email sent successfully");
+};
+
 module.exports = {
   sendEmailCreateOrder,
   sendEmailForgotPassword,
   generateOTP,
+  sendEmailRegisterOTP
 };

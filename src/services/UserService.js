@@ -1,12 +1,13 @@
 const User = require("../models/UserModel");
 const bcrypt = require("bcrypt");
+const otpStore = new Map(); // Bộ nhớ tạm thời lưu OTP
+
 const { genneralAccessToken, genneralRefreshToken } = require("./JwtService");
 const {
   sendEmailForgotPassword,
   generateOTP,
+  sendEmailRegisterOTP
 } = require("../services/EmailService");
-const crypto = require("crypto");
-
 const createUser = (newUser) => {
   return new Promise(async (resolve, reject) => {
     const { name, email, password, confirmPassword, phone } = newUser;
@@ -207,19 +208,46 @@ const forgotPassword = async (email) => {
     throw error;
   }
 };
-const verifyOtp = async (email, otp) => {
+
+const verifyOtp = async (email, otp, otpType = 'register') => {
   try {
     const user = await User.findOne({ email });
+    const otpData = otpStore.get(email);
+
+    // Kiểm tra xem email có tồn tại trong cơ sở dữ liệu không
     if (!user) {
       return { status: "ERR", message: "Email does not exist" };
     }
 
-    if (user.resetPasswordOTP !== otp) {
+    // Kiểm tra OTP trong bộ nhớ tạm thời
+    if (!otpData) {
+      return { status: "ERR", message: "OTP not found" };
+    }
+
+    // Kiểm tra loại OTP (register hoặc resetPassword)
+    if (otpData.type !== otpType) {
+      return { status: "ERR", message: `Invalid OTP for ${otpType}` };
+    }
+
+    // Kiểm tra OTP có hợp lệ không
+    if (otpData.otp !== otp) {
       return { status: "ERR", message: "Invalid OTP" };
     }
 
-    if (user.otpExpiry < Date.now()) {
+    // Kiểm tra thời gian hết hạn OTP
+    if (otpData.expiry < Date.now()) {
+      otpStore.delete(email); // Xóa OTP hết hạn
       return { status: "ERR", message: "OTP has expired" };
+    }
+
+    // Nếu là OTP đăng ký, kiểm tra otpExpiry trong User
+    if (otpType === 'register' && user.otpExpiry < Date.now()) {
+      return { status: "ERR", message: "OTP for registration has expired" };
+    }
+
+    // Nếu là OTP quên mật khẩu, kiểm tra resetPasswordOTP trong User
+    if (otpType === 'resetPassword' && user.resetPasswordOTP !== otp) {
+      return { status: "ERR", message: "Invalid OTP for password reset" };
     }
 
     return { status: "OK", message: "OTP is valid" };
@@ -227,6 +255,7 @@ const verifyOtp = async (email, otp) => {
     throw error;
   }
 };
+
 
 const resetPassword = async (email, newPassword) => {
   try {
@@ -248,6 +277,28 @@ const resetPassword = async (email, newPassword) => {
   }
 };
 
+const RegisterSendOTP = async (email) => {
+  try {
+    const user = await User.findOne({ email });
+    if (user) {
+      return { status: "ERR", message: "Email already exists" };
+    }
+
+    // Tạo OTP
+    const otp = generateOTP();
+
+    // Lưu OTP vào bộ nhớ tạm thời (5 phút)
+    otpStore.set(email, { otp, expiry: Date.now() + 5 * 60 * 1000 });
+
+    // Gửi OTP qua email
+    await sendEmailRegisterOTP(email, otp);
+
+    return { status: "OK", message: "OTP has been sent to your email" };
+  } catch (error) {
+    throw error;
+  }
+};
+
 module.exports = {
   createUser,
   loginUser,
@@ -258,5 +309,6 @@ module.exports = {
   deleteManyUser,
   forgotPassword,
   verifyOtp,
-  resetPassword
+  resetPassword,
+  RegisterSendOTP
 };

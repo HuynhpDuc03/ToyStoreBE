@@ -101,33 +101,84 @@ const deleteMany = async (req, res) => {
     }
 }
 
-
-
 const getAllProduct = async (req, res) => {
+    const { type, priceRange, sort, page = 1, limit = 10 } = req.query; // Nhận các tham số từ query string
+    const filters = {
+      type: type || null,
+      priceRange: priceRange || null,
+    };
+    
     try {
-        const { limit, page, sort, filter } = req.query;
-
-        let filters = [];
-        if (filter) {
-            if (Array.isArray(filter)) {
-                filters = filter;
-            } else {
-                filters = [filter];
-            }
-        }
-
-        const response = await ProductService.getAllProduct(Number(limit) || null, Number(page) || 0, sort, filters);
-        return res.status(200).json(response);
+      const response = await ProductService.getAllProduct(filters, sort, parseInt(page), parseInt(limit));
+      return res.status(200).json(response);
     } catch (e) {
-        return res.status(404).json({
-            message: e
-        });
+      return res.status(500).json({
+        message: "Error retrieving products",
+        error: "500",
+      });
     }
-};
+  };
 
+  const getAllProductAdmin = async (req, res) => {
+    const { page = 1, limit = 10 } = req.query; // Nhận các tham số từ query string
+    try {
+      const response = await ProductService.getAllProductAdmin(parseInt(page), parseInt(limit));
+      return res.status(200).json(response);
+    } catch (e) {
+      return res.status(500).json({
+        message: "Error retrieving products",
+        error: "500",
+      });
+    }
+  };
 
+  const getSearchProduct = async (req, res) => {
+    const { query = "", limit = 6 } = req.query; // Nhận `query` và `limit` từ query string
+    try {
+      const response = await ProductService.getSearchProduct(query, parseInt(limit));
+      return res.status(200).json(response);
+    } catch (e) {
+      return res.status(500).json({
+        message: "Error retrieving products",
+        error: e.message || "500",
+      });
+    }
+  };
 
+// const getAllProduct = async (req, res) => {
+//     try {
+//         const { limit, page, sort, filter } = req.query;
 
+//         let filters = [];
+//         if (filter) {
+//             if (Array.isArray(filter)) {
+//                 filters = filter;
+//             } else {
+//                 filters = [filter];
+//             }
+//         }
+
+//         const response = await ProductService.getAllProduct(Number(limit) || null, Number(page) || 0, sort, filters);
+//         return res.status(200).json(response);
+//     } catch (e) {
+//         return res.status(404).json({
+//             message: e
+//         });
+//     }
+// };
+
+const getProductRelated = async (req, res) => {
+    const { type = "", limit = 6 } = req.query;  
+    try {
+      const response = await ProductService.getProductRelated(type, parseInt(limit));
+      return res.status(200).json(response);
+    } catch (e) {
+      return res.status(500).json({
+        message: "Error retrieving products",
+        error: e.message || "500",
+      });
+    }
+  };
 
 
 
@@ -154,6 +205,8 @@ const getAllSpecialProducts = async (req, res) => {
     }
 }
 
+
+
 module.exports = {
     createProduct,
     updateProduct,
@@ -162,7 +215,10 @@ module.exports = {
     getAllProduct,
     deleteMany,
     getAllType,
-    getAllSpecialProducts
+    getAllSpecialProducts,
+    getAllProductAdmin,
+    getSearchProduct,
+    getProductRelated
 }
 
 // const getAllProduct = async (req, res) => {

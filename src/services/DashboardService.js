@@ -53,7 +53,7 @@ const getRevenueByChartType = (chartType, fromDate, toDate) => {
           $group: {
             _id: {
               $dateToString: {
-                format: chartType === "Year" ? "%m/%Y" : "%d/%m/%Y", // Định dạng dựa trên chartType
+                format: chartType === "Year" ? "%m/%Y" : chartType === "3Month" ? "%d/%m" : "%d/%m/%Y", // Định dạng dựa trên chartType
                 date: "$createdAt",
               },
             },
