@@ -51,15 +51,22 @@ const loginUser = (userLogin) => {
       if (checkUser === null) {
         resolve({
           status: "ERR",
-          message: "The user is not defined",
+          message: "Tài khoản không tồn tại",
         });
+      }
+      if (checkUser.isBlock) {
+        resolve({
+          status: "ERR",
+          message: "Tài khoản này đã bị khóa !",
+        });
+        return;
       }
       const comparePassword = bcrypt.compareSync(password, checkUser.password);
 
       if (!comparePassword) {
         resolve({
           status: "ERR",
-          message: "The password or user is incorrect",
+          message: "Email hoặc Mật khẩu không đúng, Vui lòng thử lại!",
         });
       }
       const access_token = await genneralAccessToken({
@@ -108,6 +115,36 @@ const updateUser = (id, data) => {
         status: "ERR",
         message: "An error occurred while updating the user",
         error: e.message,
+      });
+    }
+  });
+};
+
+const updateIsBlockStatus = (id, isBlock) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const user = await User.findById(id);
+
+      if (!user) {
+        resolve({
+          status: "ERR",
+          message: "User not found",
+        });
+      }
+
+      user.isBlock = isBlock; // Cập nhật trạng thái isBlock
+      await user.save(); // Lưu lại thay đổi
+
+      resolve({
+        status: "OK",
+        message: "User block status updated successfully",
+        data: user,
+      });
+    } catch (error) {
+      reject({
+        status: "ERR",
+        message: "An error occurred while updating isBlock",
+        error: error.message,
       });
     }
   });
@@ -310,5 +347,6 @@ module.exports = {
   forgotPassword,
   verifyOtp,
   resetPassword,
+  updateIsBlockStatus,
   RegisterSendOTP
 };

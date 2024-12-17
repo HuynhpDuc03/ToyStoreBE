@@ -81,6 +81,28 @@ const updateUser = async (req, res) => {
     });
   }
 };
+const updateIsBlock = async (req, res) => {
+  try { 
+    const { data} = req.body;  
+    const { id, isBlock } = data;  
+
+    if (typeof isBlock !== "boolean") {
+      return res.status(400).json({
+        status: "ERR",
+        message: "isBlock must be a boolean value",
+      });
+    }
+
+    const response = await UserService.updateIsBlockStatus(id, isBlock);
+    return res.status(200).json(response);
+  } catch (error) {
+    return res.status(500).json({
+      status: "ERR",
+      message: "An error occurred while updating isBlock",
+      error: error.message,
+    });
+  }
+};
 
 const deleteUser = async (req, res) => {
   try {
@@ -270,5 +292,6 @@ module.exports = {
   forgotPassword,
   verifyOtp,
   resetPassword,
+  updateIsBlock,
   RegisterSendOTP
 };

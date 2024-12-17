@@ -16,5 +16,5 @@ router.post('/forgot-password', userController.forgotPassword);
 router.post('/register-send-otp', userController.RegisterSendOTP);
 router.post('/reset-password', userController.resetPassword);
 router.post('/verify-Otp', userController.verifyOtp); 
-
+router.put("/block-status", userController.updateIsBlock);
 module.exports = router;
