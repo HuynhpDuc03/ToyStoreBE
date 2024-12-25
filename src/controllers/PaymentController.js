@@ -56,8 +56,7 @@ const createZaloPayOrder = async (req, res) => {
       item: JSON.stringify(items),
       description: `AntDesign - Payment for order #${orderId}`,
       bank_code: "",
-      callback_url: "https://3749-171-243-49-87.ngrok-free.app/api/payment/callback",
-      redirecturl:"https://www.youtube.com/"
+      callback_url: ZaloPayConfig.linkcallback,
     };
 
     // Tạo chữ ký (HMAC-SHA256)
