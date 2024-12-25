@@ -2,7 +2,6 @@ const Order = require("../models/OrderProduct");
 const Product = require("../models/ProductModel");
 const EmailService = require("../services/EmailService");
 const VnProvinces = require("vn-local-plus");
-
 const getAddressDetails = (cityCode, districtCode, wardCode) => {
   const city = VnProvinces.getProvinceByCode(cityCode)?.name;
   const district = VnProvinces.getDistrictByCode(districtCode)?.name;
@@ -111,6 +110,7 @@ const createOrder = (newOrder) => {
       return resolve({
         status: "OK",
         message: "success",
+        data: createdOrder._id,
       });
 
     } catch (error) {
@@ -324,6 +324,13 @@ const markOrderAsReceived = async (orderId, isPaid, isDelivered) => {
 };
 
 
+const updateOrderPayment = async (orderId, zpTransToken) => {
+  return Order.findByIdAndUpdate(orderId, { paymentToken: zpTransToken });
+};
+
+const updateOrderStatusZaloPay = async (orderID, isPaid) => {
+  return Order.findByIdAndUpdate(orderID, { isPaid, updatedAt: new Date() });
+};
 
 
 module.exports = {
@@ -334,4 +341,6 @@ module.exports = {
   getAllOrder,
   updateOrderStatus,
   markOrderAsReceived,
+  updateOrderPayment,
+  updateOrderStatusZaloPay,
 };

@@ -520,7 +520,7 @@ const getProductRelated = (type, limit = 6) => {
       const products = await Product.aggregate([
         {
           $match: { type: type }  // Lọc sản phẩm theo thể loại, có thể mở rộng với nhiều thể loại
-        },
+        },  
         {
           $project: {
             name: 1,
